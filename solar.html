@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Адаптивный калькулятор банковских кредитов и энергии</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/solar.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-calculator"></i>Финансовые калькуляторы</h1>
+
+            <div class="calculator-switcher">
+                <button class="switch-btn active" data-calc="loan">
+                    <i class="fas fa-landmark"></i> Кредитный калькулятор
+                </button>
+                <button class="switch-btn" data-calc="energy">
+                    <i class="fas fa-bolt"></i> Калькулятор энергии
+                </button>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Калькулятор кредитов -->
+            <div class="calculator active" id="loan-calculator">
+                <div class="calculator-grid">
+                    <div class="input-section">
+                        <h2><i class="fas fa-calculator"></i> Параметры кредита</h2>
+                        <div class="form-group">
+                            <label for="loanAmount" class="form-label">Сумма кредита :</label>
+                            <input type="number" id="loanAmount" class="form-input" value="1000000" min="1000">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="interestRate" class="form-label">Процентная ставка (% годовых):</label>
+                            <input type="number" id="interestRate" class="form-input" value="12" min="0.1" step="0.1">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loanTerm" class="form-label">Срок кредита (месяцев):</label>
+                            <input type="number" id="loanTerm" class="form-input" value="60" min="1">
+                        </div>
+
+                        <div class="form-group">
+                            <h4 class="form-label">Тип платежей:</h4>
+                            <div class="radio-group">
+                                <label for="paymentType" class="radio-label">
+                                    <input type="radio" name="paymentType" id="paymentType" value="annuity" checked>
+                                    Аннуитетные
+                                </label>
+                                <label for="paymentType-2" class="radio-label">
+                                    <input type="radio" name="paymentType" id="paymentType-2" value="differentiated">
+                                    Дифференцированные
+                                </label>
+                            </div>
+                        </div>
+
+                        <button id="calculateLoan" class="calculate-btn">Рассчитать кредит</button>
+                    </div>
+
+                    <div class="result-section">
+                        <h2 class="result-title"><i class="fas fa-chart-line"></i> Результаты расчета</h2>
+
+                        <div class="result-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Ежемесячный платеж:</span>
+                                <span id="monthlyPayment" class="summary-value">-</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Общая сумма выплат:</span>
+                                <span id="totalPayment" class="summary-value">-</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Переплата по кредиту:</span>
+                                <span id="overpayment" class="summary-value">-</span>
+                            </div>
+                            <div id="firstPaymentItem" class="summary-item hidden">
+                                <span class="summary-label">Первый платеж:</span>
+                                <span id="firstPayment" class="summary-value">-</span>
+                            </div>
+                            <div id="lastPaymentItem" class="summary-item hidden">
+                                <span class="summary-label">Последний платеж:</span>
+                                <span id="lastPayment" class="summary-value">-</span>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <h3><i class="fas fa-table"></i> График платежей</h3>
+                            <span>первые 12 месяцев</span>
+                            <table class="payment-table">
+                                <thead>
+                                    <tr>
+                                        <th>Месяц</th>
+                                        <th>Платеж</th>
+                                        <th>Основной долг</th>
+                                        <th>Проценты</th>
+                                        <th>Остаток долга</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="scheduleBody">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="chart-container">
+                            <canvas id="paymentChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Калькулятор энергии -->
+            <div class="calculator" id="energy-calculator">
+                <div class="calculator-grid">
+                    <div class="input-section">
+                        <h2><i class="fas fa-bolt"></i> Расчет потребления энергии</h2>
+                        <div class="form-group">
+                            <label for="energyCost" class="form-label">Сумма расходов на энергию :</label>
+                            <input type="number" id="energyCost" class="form-input" value="15000" min="100">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="energyTariff" class="form-label">Тариф (кВт·ч):</label>
+                            <input type="number" id="energyTariff" class="form-input" value="50" min="0.1" step="0.1">
+                        </div>
+
+                        <button id="calculateEnergy" class="calculate-btn">Рассчитать потребление</button>
+                    </div>
+
+                    <div class="result-section">
+                        <h2 class="result-title"><i class="fas fa-chart-pie"></i> Результаты расчета</h2>
+
+                        <div class="result-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Потребление энергии:</span>
+                                <span id="energyConsumption" class="summary-value">-</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Сумма расходов:</span>
+                                <span id="totalCost" class="summary-value">-</span>
+                            </div>
+                        </div>
+
+                        <div class="comparison">
+                            <div class="comparison-item">
+                                <div class="comparison-label">Ежедневное потребление</div>
+                                <div id="dailyConsumption" class="comparison-value">-</div>
+                                <div class="comparison-label">кВт·ч/день</div>
+                            </div>
+                            <div class="comparison-item">
+                                <div class="comparison-label">Ежемесячное потребление</div>
+                                <div id="monthlyConsumption" class="comparison-value">-</div>
+                                <div class="comparison-label">кВт·ч/месяц</div>
+                            </div>
+                        </div>
+
+                        <!-- Фильтры для солнечных панелей -->
+                        <div class="filter-section">
+                            <div class="filter-group">
+                                <label for="brandFilter" class="form-label">Бренд:</label>
+                                <select id="brandFilter" class="form-input">
+                                    <option value="all">Все бренды</option>
+                                    <option value="LONGi">LONGi</option>
+                                    <option value="SWISS">SWISS</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="typeFilter" class="form-label">Тип системы:</label>
+                                <select id="typeFilter" class="form-input">
+                                    <option value="all">Все типы</option>
+                                    <option value="hybrid">Гибридная</option>
+                                    <option value="grid">Сетевая</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="energy-data">
+                            <h3><i class="fas fa-solar-panel"></i> Данные по солнечным панелям</h3>
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Бренд</th>
+                                            <th>Тип системы</th>
+                                            <th>Мощность, Вт</th>
+                                            <th>Количество</th>
+                                            <th>Фазы</th>
+                                            <th>Стоимость, ֏</th>
+                                            <th>Экономия, мес</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="solarDataBody">
+                                        <!-- Данные будут заполнены через JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/solar.js"></script>
+</body>
+</html>
