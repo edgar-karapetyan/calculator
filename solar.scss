@@ -136,7 +136,7 @@ body {
 
 .calculator-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 2fr;
     gap: clamp(20px, 4vw, 30px);
 
     @media (max-width: 968px) {
@@ -176,6 +176,7 @@ input[type='radio'] {
 }
 
 .input-section {
+    height: fit-content;
     background: var(--light);
     padding: clamp(20px, 3vw, 25px);
     border-radius: var(--radius);
@@ -438,7 +439,6 @@ input[type='radio'] {
     background: white;
     border-radius: var(--radius);
     padding: clamp(15px, 3vw, 20px);
-    box-shadow: 0 0 10px var(--shadow);
     width: 100%;
 
     h3 {
