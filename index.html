@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,17 +9,20 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="solar.css">
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-calculator"></i>Финансовые калькуляторы</h1>
 
             <div class="calculator-switcher">
+                <div class="calculator-switcher_open_close">
+                    <div></div>
+                </div>
                 <button class="switch-btn active" data-calc="loan">
-                    <i class="fas fa-landmark"></i> Кредитный калькулятор
-                </button>
+                    <i class="fas fa-landmark"></i></button>
                 <button class="switch-btn" data-calc="energy">
-                    <i class="fas fa-bolt"></i> Калькулятор энергии
+                    <i class="fas fa-bolt"></i>
                 </button>
             </div>
         </div>
@@ -86,10 +90,10 @@
                                 <span id="lastPayment" class="summary-value">-</span>
                             </div>
                         </div>
+                        <h3><i class="fas fa-table"></i> График платежей</h3>
+                        <span>первые 12 месяцев</span>
 
                         <div class="table-container">
-                            <h3><i class="fas fa-table"></i> График платежей</h3>
-                            <span>первые 12 месяцев</span>
                             <table class="payment-table">
                                 <thead>
                                     <tr>
@@ -157,6 +161,9 @@
                             </div>
                         </div>
 
+                        <!-- Контейнер для рекомендаций по солнечным панелям -->
+                        <div id="solarRecommendations"></div>
+
                         <!-- Фильтры для солнечных панелей -->
                         <div class="filter-section">
                             <div class="filter-group">
@@ -203,6 +210,7 @@
             </div>
         </div>
     </div>
-    <script src="solar.js"></script>
+    <script src="script.js"></script>
 </body>
+
 </html>
