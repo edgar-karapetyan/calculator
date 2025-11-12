@@ -585,16 +585,16 @@ input[type=radio]:checked:after {
 }
 @media (max-width: 425px) {
   .result-section .table-container {
-    width: 368px;
+    width: 360px;
   }
 }
 @media (max-width: 375px) {
   .result-section .table-container {
-    width: 309px;
+    width: 290px;
   }
 }
 @media (max-width: 320px) {
   .result-section .table-container {
-    width: 273px;
+    width: 265px;
   }
 }
