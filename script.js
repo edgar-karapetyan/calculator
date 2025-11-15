@@ -1,51 +1,95 @@
 // Таймеры для задержки расчета
 let loanCalculationTimer;
 let energyCalculationTimer;
+let check = 0;
+
+// Данные тепловых насосов из PDF
+const heatPumpData = [
+    {
+        model: "092A/BEF/100W",
+        powerRange: "5.8-10 кВт",
+        consumptionRange: "60-120",
+        performance: "2.3-2.8",
+        cost: 1400000,
+        savings: 650
+    },
+    {
+        model: "092A/BEF/121A-AKW", 
+        powerRange: "8.5-12.4 кВт",
+        consumptionRange: "100-150",
+        performance: "4.7-5.5",
+        cost: 1440000,
+        savings: 1100
+    },
+    {
+        model: "202A/BEF/200W",
+        powerRange: "13-20 кВт", 
+        consumptionRange: "130-220",
+        performance: "5.1-6",
+        cost: 1400000,
+        savings: 1400
+    },
+    {
+        model: "202A/BEF/200W",
+        powerRange: "13-20 кВт",
+        consumptionRange: "130-220", 
+        performance: "5.1-6",
+        cost: 1500000,
+        savings: 1400
+    },
+    {
+        model: "242A/SBEF/24AW",
+        powerRange: "15-24 кВт",
+        consumptionRange: "150-240",
+        performance: "5.9-7.4", 
+        cost: 1650000,
+        savings: 1600
+    },
+    {
+        model: "060ZA/BEF/22A-AKW",
+        powerRange: "17-24.7 кВт",
+        consumptionRange: "180-300",
+        performance: "9.3-10.2",
+        cost: 2400000,
+        savings: 2000
+    }
+];
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function () {
     initializeCalculators();
-    // Запускаем первоначальный расчет
     calculateLoanWithDelay();
     calculateEnergyWithDelay();
-
-    // Восстанавливаем выбранный калькулятор из localStorage
     restoreCalculatorState();
-
-    // Заполняем таблицу солнечных данных
     populateSolarTable();
+    populateHeatPumpTable();
+    initializeSwitcherToggle();
 });
 
 // Инициализация обработчиков событий
 function initializeCalculators() {
-    // Обработчики для кредитного калькулятора
+    applyNumberFormattingToAllInputs();
+
     const loanInputs = ['loanAmount', 'interestRate', 'loanTerm'];
     loanInputs.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
-            element.addEventListener('input', function () {
-                calculateLoanWithDelay();
-            });
+            element.addEventListener('input', calculateLoanWithDelay);
         }
     });
 
-    // Обработчики для радиокнопок типа платежей
     document.querySelectorAll('input[name="paymentType"]').forEach(radio => {
         radio.addEventListener('change', calculateLoanWithDelay);
     });
 
-    // Обработчики для калькулятора энергии
     const energyInputs = ['energyCost', 'energyTariff'];
     energyInputs.forEach(id => {
         const element = document.getElementById(id);
         if (element) {
-            element.addEventListener('input', function () {
-                calculateEnergyWithDelay();
-            });
+            element.addEventListener('input', calculateEnergyWithDelay);
         }
     });
 
-    // Обработчики для кнопок ручного расчета
     const calculateLoanBtn = document.getElementById('calculateLoan');
     const calculateEnergyBtn = document.getElementById('calculateEnergy');
 
@@ -56,101 +100,48 @@ function initializeCalculators() {
         calculateEnergyBtn.addEventListener('click', calculateEnergy);
     }
 
-    // Обработчики для переключения между калькуляторами
     document.querySelectorAll('.switch-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            // Убираем активный класс у всех кнопок
-            document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-            // Добавляем активный класс текущей кнопке
-            this.classList.add('active');
-
-            // Скрываем все калькуляторы
-            document.querySelectorAll('.calculator').forEach(calc => calc.classList.remove('active'));
-            // Показываем выбранный калькулятор
-            const calcId = this.getAttribute('data-calc') + '-calculator';
-            const targetCalc = document.getElementById(calcId);
-            if (targetCalc) {
-                targetCalc.classList.add('active');
-            }
-
-            // Сохраняем состояние в localStorage
-            const selectedCalc = this.getAttribute('data-calc');
-            localStorage.setItem('selectedCalculator', selectedCalc);
-        });
+        btn.addEventListener('click', handleSwitchBtnClick);
     });
 
-    // Обработчики для фильтров солнечных панелей
     const brandFilter = document.getElementById('brandFilter');
     const typeFilter = document.getElementById('typeFilter');
+    const pumpModelFilter = document.getElementById('pumpModelFilter');
 
-    if (brandFilter) {
-        brandFilter.addEventListener('change', function () {
-            updateSolarTableWithFilters(this.value, typeFilter ? typeFilter.value : 'all');
-        });
-    }
-
-    if (typeFilter) {
-        typeFilter.addEventListener('change', function () {
-            updateSolarTableWithFilters(brandFilter ? brandFilter.value : 'all', this.value);
-        });
-    }
+    if (brandFilter) brandFilter.addEventListener('change', handleFilterChange);
+    if (typeFilter) typeFilter.addEventListener('change', handleFilterChange);
+    if (pumpModelFilter) pumpModelFilter.addEventListener('change', handleHeatPumpFilterChange);
 }
 
-// Восстановление состояния калькулятора из localStorage
-function restoreCalculatorState() {
-    const savedCalculator = localStorage.getItem('selectedCalculator');
-    if (savedCalculator) {
-        // Находим соответствующую кнопку
-        const targetBtn = document.querySelector(`.switch-btn[data-calc="${savedCalculator}"]`);
-        if (targetBtn) {
-            // Убираем активный класс у всех кнопок
-            document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
-            // Добавляем активный класс сохраненной кнопке
-            targetBtn.classList.add('active');
-
-            // Скрываем все калькуляторы
-            document.querySelectorAll('.calculator').forEach(calc => calc.classList.remove('active'));
-            // Показываем сохраненный калькулятор
-            const calcId = savedCalculator + '-calculator';
-            const targetCalc = document.getElementById(calcId);
-            if (targetCalc) {
-                targetCalc.classList.add('active');
-            }
-        }
-    }
-}
-
-// Функции с задержкой для кредитного калькулятора
+// Функции для кредитного калькулятора
 function calculateLoanWithDelay() {
     clearTimeout(loanCalculationTimer);
     loanCalculationTimer = setTimeout(calculateLoan, 800);
 }
 
 function calculateLoan() {
-    const loanAmount = parseFloat(document.getElementById('loanAmount').value);
-    const annualInterestRate = parseFloat(document.getElementById('interestRate').value);
-    const loanTermMonths = parseInt(document.getElementById('loanTerm').value);
+    const loanAmount = parseFloat(unformatNumber(document.getElementById('loanAmount').value));
+    const annualInterestRate = parseFloat(unformatNumber(document.getElementById('interestRate').value));
+    const loanTermYears = parseFloat(unformatNumber(document.getElementById('loanTerm').value));
     const paymentTypeElement = document.querySelector('input[name="paymentType"]:checked');
 
     if (!paymentTypeElement) return;
 
     const paymentType = paymentTypeElement.value;
 
-    if (isNaN(loanAmount) || isNaN(annualInterestRate) || isNaN(loanTermMonths) ||
-        loanAmount <= 0 || annualInterestRate <= 0 || loanTermMonths <= 0) {
+    if (isNaN(loanAmount) || isNaN(annualInterestRate) || isNaN(loanTermYears) ||
+        loanAmount <= 0 || annualInterestRate <= 0 || loanTermYears <= 0) {
         return;
     }
 
-    // Показываем индикатор загрузки
     showLoadingIndicator('loan');
 
-    // Имитация задержки для лучшего UX
     setTimeout(() => {
+        const loanTermMonths = loanTermYears * 12;
         const monthlyInterestRate = annualInterestRate / 100 / 12;
         let monthlyPayment, totalPayment, overpayment;
 
         if (paymentType === 'annuity') {
-            // Аннуитетный платеж
             const annuityCoefficient = (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) /
                 (Math.pow(1 + monthlyInterestRate, loanTermMonths) - 1);
             monthlyPayment = loanAmount * annuityCoefficient;
@@ -162,7 +153,6 @@ function calculateLoan() {
             if (firstPaymentItem) firstPaymentItem.classList.add('hidden');
             if (lastPaymentItem) lastPaymentItem.classList.add('hidden');
         } else {
-            // Дифференцированный платеж
             const principalPayment = loanAmount / loanTermMonths;
             const firstInterest = loanAmount * monthlyInterestRate;
             const lastInterest = principalPayment * monthlyInterestRate;
@@ -195,34 +185,28 @@ function calculateLoan() {
 
         generateSchedule(loanAmount, monthlyInterestRate, monthlyPayment, loanTermMonths, paymentType);
         createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentType);
-
-        // Скрываем индикатор загрузки
         hideLoadingIndicator('loan');
-
     }, 300);
 }
 
-// Функции с задержкой для калькулятора энергии
+// Функции для калькулятора энергии
 function calculateEnergyWithDelay() {
     clearTimeout(energyCalculationTimer);
     energyCalculationTimer = setTimeout(calculateEnergy, 800);
 }
 
 function calculateEnergy() {
-    const cost = parseFloat(document.getElementById('energyCost').value);
-    const tariff = parseFloat(document.getElementById('energyTariff').value);
+    const cost = parseFloat(unformatNumber(document.getElementById('energyCost').value));
+    const tariff = parseFloat(unformatNumber(document.getElementById('energyTariff').value));
 
     if (isNaN(cost) || isNaN(tariff) || cost <= 0 || tariff <= 0) {
-        // Очищаем рекомендации, если данные невалидны
         const recommendationsContainer = document.getElementById('solarRecommendations');
         if (recommendationsContainer) recommendationsContainer.innerHTML = '';
         return;
     }
 
-    // Показываем индикатор загрузки
     showLoadingIndicator('energy');
 
-    // Имитация задержки для лучшего UX
     setTimeout(() => {
         const consumption = cost / tariff;
         const dailyConsumption = consumption / 30;
@@ -238,21 +222,70 @@ function calculateEnergy() {
         if (dailyConsumptionElement) dailyConsumptionElement.textContent = `${dailyConsumption.toFixed(2)}`;
         if (monthlyConsumptionElement) monthlyConsumptionElement.textContent = `${monthlyConsumption.toFixed(2)}`;
 
-        // Получаем и отображаем рекомендации по солнечным панелям
         displaySolarRecommendations(cost);
-
-        // Скрываем индикатор загрузки
         hideLoadingIndicator('energy');
-
     }, 300);
 }
 
-// Функция форматирования валюты в армянские драмы
+// Функции для тепловых насосов
+function populateHeatPumpTable() {
+    const heatPumpDataBody = document.getElementById('heatPumpDataBody');
+    if (!heatPumpDataBody) return;
+
+    heatPumpDataBody.innerHTML = '';
+
+    heatPumpData.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item.model}</td>
+            <td>${item.powerRange}</td>
+            <td>${item.consumptionRange}</td>
+            <td>${item.performance}</td>
+            <td>${item.cost.toLocaleString('ru-RU')} ֏</td>
+            <td>${item.savings.toLocaleString('ru-RU')} ֏/мес</td>
+        `;
+        heatPumpDataBody.appendChild(row);
+    });
+}
+
+function filterHeatPumpData(model = 'all') {
+    return heatPumpData.filter(item => {
+        return model === 'all' || item.model.includes(model);
+    });
+}
+
+function updateHeatPumpTableWithFilters(model = 'all') {
+    const filteredData = filterHeatPumpData(model);
+    const heatPumpDataBody = document.getElementById('heatPumpDataBody');
+
+    if (!heatPumpDataBody) return;
+
+    heatPumpDataBody.innerHTML = '';
+
+    filteredData.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item.model}</td>
+            <td>${item.powerRange}</td>
+            <td>${item.consumptionRange}</td>
+            <td>${item.performance}</td>
+            <td>${item.cost.toLocaleString('ru-RU')} ֏</td>
+            <td>${item.savings.toLocaleString('ru-RU')} ֏/мес</td>
+        `;
+        heatPumpDataBody.appendChild(row);
+    });
+}
+
+function handleHeatPumpFilterChange() {
+    const modelFilter = document.getElementById('pumpModelFilter');
+    updateHeatPumpTableWithFilters(modelFilter ? modelFilter.value : 'all');
+}
+
+// Вспомогательные функции
 function formatCurrency(amount) {
     return `${amount.toFixed(2).toLocaleString('ru-RU')} ֏`;
 }
 
-// Функции для индикаторов загрузки
 function showLoadingIndicator(type) {
     const calculateBtn = type === 'loan' ?
         document.getElementById('calculateLoan') :
@@ -263,8 +296,6 @@ function showLoadingIndicator(type) {
     const originalText = calculateBtn.innerHTML;
     calculateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Расчет...';
     calculateBtn.disabled = true;
-
-    // Сохраняем оригинальный текст для восстановления
     calculateBtn.setAttribute('data-original-text', originalText);
 }
 
@@ -281,6 +312,174 @@ function hideLoadingIndicator(type) {
     }
     calculateBtn.disabled = false;
 }
+
+// Остальные функции (generateSchedule, createChart, populateSolarTable, displaySolarRecommendations и т.д.)
+// ... (добавьте остальные функции из предыдущего кода)
+
+// Переключение калькуляторов
+function handleSwitchBtnClick() {
+    document.querySelectorAll('.switch-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+
+    document.querySelectorAll('.calculator').forEach(calc => calc.classList.remove('active'));
+    const calcId = this.getAttribute('data-calc') + '-calculator';
+    const targetCalc = document.getElementById(calcId);
+    if (targetCalc) {
+        targetCalc.classList.add('active');
+    }
+
+    const selectedCalc = this.getAttribute('data-calc');
+    localStorage.setItem('selectedCalculator', selectedCalc);
+
+    document.querySelector('.calculator-switcher').classList.remove('calculator-switcher-open');
+    document.querySelector('.calculator-switcher_open_close').classList.remove('calculator-switcher_open_close-active');
+    check = 0;
+}
+
+function restoreCalculatorState() {
+    const savedCalculator = localStorage.getItem('selectedCalculator');
+    if (savedCalculator) {
+        const targetBtn = document.querySelector(`.switch-btn[data-calc="${savedCalculator}"]`);
+        if (targetBtn) {
+            targetBtn.click();
+        }
+    }
+}
+
+function initializeSwitcherToggle() {
+    const switcherToggle = document.querySelector('.calculator-switcher_open_close');
+    if (switcherToggle) {
+        switcherToggle.addEventListener('click', handleSwitcherToggle);
+    }
+}
+
+function handleSwitcherToggle() {
+    const switcher = document.querySelector('.calculator-switcher');
+    const toggleBtn = document.querySelector('.calculator-switcher_open_close');
+
+    if (check === 0) {
+        switcher.classList.add('calculator-switcher-open');
+        toggleBtn.classList.add('calculator-switcher_open_close-active');
+        check = 1;
+    } else {
+        switcher.classList.remove('calculator-switcher-open');
+        toggleBtn.classList.remove('calculator-switcher_open_close-active');
+        check = 0;
+    }
+}
+
+// Функции форматирования чисел
+function applyNumberFormattingToAllInputs() {
+    const inputs = document.querySelectorAll('input[type="number"], input[type="text"]');
+    inputs.forEach(input => {
+        if (isNumberField(input)) {
+            applyNumberFormatting(input);
+        }
+    });
+}
+
+function isNumberField(input) {
+    return (
+        input.type === 'number' ||
+        input.getAttribute('inputmode') === 'numeric' ||
+        input.classList.contains('number-input') ||
+        input.getAttribute('name')?.includes('number') ||
+        input.getAttribute('id')?.includes('number') ||
+        input.getAttribute('data-type') === 'number'
+    );
+}
+
+function applyNumberFormatting(input) {
+    if (input.hasAttribute('data-formatted')) return;
+    formatInputValue(input);
+    input.addEventListener('blur', () => formatInputValue(input));
+    input.addEventListener('focus', () => unformatInputValue(input));
+    input.addEventListener('input', handleNumberInput);
+    input.setAttribute('data-formatted', 'true');
+}
+
+function formatInputValue(input) {
+    if (input.value && input.value.trim() !== '') {
+        const cursorPosition = input.selectionStart;
+        const valueBeforeFormat = input.value;
+        input.value = formatNumber(input.value);
+        const addedChars = input.value.length - valueBeforeFormat.length;
+        input.setSelectionRange(cursorPosition + addedChars, cursorPosition + addedChars);
+    }
+}
+
+function unformatInputValue(input) {
+    if (input.value) {
+        const cursorPosition = input.selectionStart;
+        const valueBeforeUnformat = input.value;
+        input.value = input.value.replace(/\./g, '');
+        const removedChars = valueBeforeUnformat.length - input.value.length;
+        const newCursorPosition = Math.max(0, cursorPosition - removedChars);
+        input.setSelectionRange(newCursorPosition, newCursorPosition);
+    }
+}
+
+function handleNumberInput(e) {
+    const input = e.target;
+    let value = input.value;
+    const cursorPosition = input.selectionStart;
+    value = value.replace(/[^\d,.]/g, '');
+    const decimalSeparators = value.match(/[,.]/g);
+    if (decimalSeparators && decimalSeparators.length > 1) {
+        const firstSeparatorIndex = value.search(/[,.]/);
+        value = value.substring(0, firstSeparatorIndex + 1) +
+            value.substring(firstSeparatorIndex + 1).replace(/[,.]/g, '');
+    }
+    input.value = value;
+    input.setSelectionRange(cursorPosition, cursorPosition);
+}
+
+function formatNumber(number) {
+    if (!number && number !== 0) return '';
+    let numStr = number.toString().replace(/\s/g, '');
+    numStr = numStr.replace(/\./g, '');
+    numStr = numStr.replace(',', '.');
+    const parts = numStr.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return parts.length > 1 ? parts[0] + ',' + parts[1] : parts[0];
+}
+
+function unformatNumber(formattedNumber) {
+    if (!formattedNumber) return '';
+    return formattedNumber.toString()
+        .replace(/\./g, '')
+        .replace(',', '.');
+}
+
+// Observer для динамически добавляемых элементов
+const observer = new MutationObserver(function (mutations) {
+    mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+            if (node.nodeType === 1) {
+                const inputs = node.querySelectorAll ?
+                    node.querySelectorAll('input[type="number"], input[type="text"]') : [];
+                inputs.forEach(input => {
+                    if (isNumberField(input) && !input.hasAttribute('data-formatted')) {
+                        applyNumberFormatting(input);
+                        input.setAttribute('data-formatted', 'true');
+                    }
+                });
+            }
+        });
+    });
+});
+
+observer.observe(document.body, {
+    childList: true,
+    subtree: true
+});
+
+
+
+
+
+
+
 
 // Вспомогательные функции для кредитного калькулятора
 function generateSchedule(loanAmount, monthlyInterestRate, monthlyPayment, loanTermMonths, paymentType) {
@@ -317,10 +516,23 @@ function generateSchedule(loanAmount, monthlyInterestRate, monthlyPayment, loanT
 
     // Добавляем строку с информацией об остальных платежах
     if (loanTermMonths > maxRows) {
+        const remainingMonths = loanTermMonths - maxRows;
+        const remainingYears = Math.floor(remainingMonths / 12);
+        const remainingMonthsOnly = remainingMonths % 12;
+
+        let remainingText = '';
+        if (remainingYears > 0 && remainingMonthsOnly > 0) {
+            remainingText = `... и еще ${remainingYears} год ${remainingMonthsOnly} месяцев`;
+        } else if (remainingYears > 0) {
+            remainingText = `... и еще ${remainingYears} лет`;
+        } else {
+            remainingText = `... и еще ${remainingMonthsOnly} месяцев`;
+        }
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td colspan="5" style="text-align: center; font-style: italic;">
-                ... и еще ${loanTermMonths - maxRows} платежей
+                ${remainingText}
             </td>
         `;
         scheduleBody.appendChild(row);
@@ -343,11 +555,30 @@ function createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentTyp
     const principalData = [];
     const interestData = [];
 
-    // Создаем данные для графика (каждый 3-й месяц для читаемости)
-    const step = Math.max(1, Math.floor(loanTermMonths / 12));
+    // Создаем данные для графика (помесячно для первого года, потом поквартально)
+    let step = 1;
+    if (loanTermMonths > 24) {
+        step = 3; // Показывать поквартально после 2 лет
+    }
+    if (loanTermMonths > 60) {
+        step = 6; // Показывать раз в полгода после 5 лет
+    }
 
     for (let month = 1; month <= loanTermMonths; month += step) {
-        labels.push(`Месяц ${month}`);
+        // Форматируем метку в годах и месяцах
+        const years = Math.floor(month / 12);
+        const months = month % 12;
+
+        let label = '';
+        if (years > 0 && months > 0) {
+            label = `${years} год ${months} мес`;
+        } else if (years > 0) {
+            label = `${years} год`;
+        } else {
+            label = `${months} мес`;
+        }
+
+        labels.push(label);
 
         if (paymentType === 'annuity') {
             const annuityCoefficient = (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) /
@@ -379,8 +610,20 @@ function createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentTyp
     }
 
     // Добавляем последний месяц если его нет
-    if (labels[labels.length - 1] !== `Месяц ${loanTermMonths}`) {
-        labels.push(`Месяц ${loanTermMonths}`);
+    if (loanTermMonths % step !== 0) {
+        const years = Math.floor(loanTermMonths / 12);
+        const months = loanTermMonths % 12;
+
+        let label = '';
+        if (years > 0 && months > 0) {
+            label = `${years} год ${months} мес`;
+        } else if (years > 0) {
+            label = `${years} год`;
+        } else {
+            label = `${months} мес`;
+        }
+
+        labels.push(label);
 
         if (paymentType === 'annuity') {
             const annuityCoefficient = (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, loanTermMonths)) /
@@ -417,7 +660,7 @@ function createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentTyp
             labels: labels,
             datasets: [
                 {
-                    label: 'Общий платеж',
+                    label: 'Ежемесячный платеж',
                     data: paymentData,
                     borderColor: 'rgb(75, 192, 192)',
                     backgroundColor: 'rgba(75, 192, 192, 0.1)',
@@ -448,7 +691,7 @@ function createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentTyp
             plugins: {
                 title: {
                     display: true,
-                    text: `Динамика ${paymentType === 'annuity' ? 'аннуитетных' : 'дифференцированных'} платежей ֏`,
+                    text: `Динамика ${paymentType === 'annuity' ? 'аннуитетных' : 'дифференцированных'} платежей`,
                     color: '#ff8400',
                     font: {
                         size: 16
@@ -459,7 +702,7 @@ function createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentTyp
                     intersect: false,
                     callbacks: {
                         label: function (context) {
-                            return `${context.dataset.label}: ${context.raw.toFixed(2)} ֏`;
+                            return `${context.dataset.label}: ${formatCurrency(context.raw)}`;
                         }
                     }
                 }
@@ -469,14 +712,14 @@ function createChart(loanAmount, monthlyInterestRate, loanTermMonths, paymentTyp
                     beginAtZero: true,
                     ticks: {
                         callback: function (value) {
-                            return value.toFixed(0) + ' ֏';
+                            return formatCurrency(value);
                         }
                     }
                 },
                 x: {
                     title: {
                         display: true,
-                        text: 'Период'
+                        text: 'Период (годы и месяцы)'
                     }
                 }
             },
@@ -501,6 +744,38 @@ const solarData = [
     { brand: 'LONGi', type: 'hybrid', power: 50000, count: 8, phase: 1, cost: 2280000, savings: 35900 },
     { brand: 'LONGi', type: 'hybrid', power: 55000, count: 8, phase: 1, cost: 2400000, savings: 37800 },
     { brand: 'LONGi', type: 'hybrid', power: 60000, count: 8, phase: 1, cost: 2520000, savings: 39600 },
+    { brand: 'LONGi', type: 'hybrid', power: 65000, count: 8, phase: 1, cost: 2640000, savings: 41500 },
+    { brand: 'LONGi', type: 'hybrid', power: 65000, count: 10, phase: 1, cost: 2790000, savings: 43900 },
+    { brand: 'LONGi', type: 'hybrid', power: 68000, count: 10, phase: 1, cost: 2910000, savings: 45800 },
+    { brand: 'LONGi', type: 'hybrid', power: 70000, count: 10, phase: 1, cost: 3020000, savings: 47500 },
+    { brand: 'LONGi', type: 'hybrid', power: 75000, count: 10, phase: 1, cost: 3140000, savings: 49400 },
+    { brand: 'LONGi', type: 'hybrid', power: 50000, count: 10, phase: 3, cost: 2550000, savings: 40100 },
+    { brand: 'LONGi', type: 'hybrid', power: 55000, count: 10, phase: 3, cost: 2660000, savings: 41800 },
+    { brand: 'LONGi', type: 'hybrid', power: 60000, count: 10, phase: 3, cost: 2770000, savings: 43600 },
+    { brand: 'LONGi', type: 'hybrid', power: 65000, count: 10, phase: 3, cost: 2890000, savings: 45400 },
+    { brand: 'LONGi', type: 'hybrid', power: 68000, count: 10, phase: 3, cost: 3000000, savings: 47200 },
+    { brand: 'LONGi', type: 'hybrid', power: 70000, count: 10, phase: 3, cost: 3110000, savings: 48900 },
+    { brand: 'LONGi', type: 'hybrid', power: 75000, count: 10, phase: 3, cost: 3220000, savings: 50600 },
+    { brand: 'LONGi', type: 'hybrid', power: 77000, count: 15, phase: 3, cost: 3490000, savings: 54900 },
+    { brand: 'LONGi', type: 'hybrid', power: 80000, count: 15, phase: 3, cost: 3600000, savings: 56600 },
+    { brand: 'LONGi', type: 'hybrid', power: 90000, count: 15, phase: 3, cost: 3710000, savings: 58300 },
+    { brand: 'LONGi', type: 'hybrid', power: 100000, count: 15, phase: 3, cost: 3820000, savings: 60100 },
+    { brand: 'LONGi', type: 'hybrid', power: 105000, count: 15, phase: 3, cost: 3940000, savings: 61900 },
+    { brand: 'LONGi', type: 'hybrid', power: 110000, count: 15, phase: 3, cost: 4140000, savings: 65100 },
+    { brand: 'LONGi', type: 'hybrid', power: 120000, count: 20, phase: 3, cost: 4510000, savings: 70900 },
+    { brand: 'LONGi', type: 'hybrid', power: 130000, count: 20, phase: 3, cost: 4730000, savings: 74400 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 140000, count: 20, phase: 3, cost: 4960000, savings: 78000 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 150000, count: 20, phase: 3, cost: 5180000, savings: 81500 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 160000, count: 25, phase: 3, cost: 5750000, savings: 90400 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 170000, count: 25, phase: 3, cost: 5980000, savings: 94000 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 180000, count: 25, phase: 3, cost: 6320000, savings: 99400 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 190000, count: 25, phase: 3, cost: 6540000, savings: 102900 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 200000, count: 30, phase: 3, cost: 6890000, savings: 108400 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 210000, count: 30, phase: 3, cost: 7230000, savings: 113700 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 220000, count: 30, phase: 3, cost: 7450000, savings: 117200 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 230000, count: 30, phase: 3, cost: 7930000, savings: 124700 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 240000, count: 30, phase: 3, cost: 8160000, savings: 128300 },
+    { brand: 'LONGi ?', type: 'hybrid', power: 250000, count: 30, phase: 3, cost: 8370000, savings: 131600 },
 
     // LONGi сетевые системы
     { brand: 'LONGi', type: 'grid', power: 22000, count: 6, phase: 1, cost: 990000, savings: 15600 },
@@ -513,6 +788,43 @@ const solarData = [
     { brand: 'LONGi', type: 'grid', power: 50000, count: 8, phase: 1, cost: 1830000, savings: 28800 },
     { brand: 'LONGi', type: 'grid', power: 55000, count: 8, phase: 1, cost: 1950000, savings: 30700 },
     { brand: 'LONGi', type: 'grid', power: 60000, count: 8, phase: 1, cost: 2070000, savings: 32600 },
+    { brand: 'LONGi', type: 'grid', power: 65000, count: 8, phase: 1, cost: 2190000, savings: 34500 },
+    { brand: 'LONGi', type: 'grid', power: 65000, count: 10, phase: 1, cost: 2280000, savings: 35900 },
+    { brand: 'LONGi', type: 'grid', power: 68000, count: 10, phase: 1, cost: 2400000, savings: 37800 },
+    { brand: 'LONGi', type: 'grid', power: 70000, count: 10, phase: 1, cost: 2510000, savings: 39500 },
+    { brand: 'LONGi', type: 'grid', power: 75000, count: 10, phase: 1, cost: 2630000, savings: 41400 },
+    { brand: 'LONGi', type: 'grid', power: 50000, count: 10, phase: 3, cost: 2010000, savings: 31600 },
+    { brand: 'LONGi', type: 'grid', power: 55000, count: 10, phase: 3, cost: 2120000, savings: 33400 },
+    { brand: 'LONGi', type: 'grid', power: 60000, count: 10, phase: 3, cost: 2230000, savings: 35100 },
+    { brand: 'LONGi', type: 'grid', power: 65000, count: 10, phase: 3, cost: 2350000, savings: 37000 },
+    { brand: 'LONGi', type: 'grid', power: 68000, count: 10, phase: 3, cost: 2460000, savings: 38700 },
+    { brand: 'LONGi', type: 'grid', power: 70000, count: 10, phase: 3, cost: 2570000, savings: 40400 },
+    { brand: 'LONGi', type: 'grid', power: 75000, count: 10, phase: 3, cost: 2680000, savings: 42100 },
+    { brand: 'LONGi', type: 'grid', power: 77000, count: 15, phase: 3, cost: 2830000, savings: 44500 },
+    { brand: 'LONGi', type: 'grid', power: 80000, count: 15, phase: 3, cost: 2940000, savings: 46200 },
+    { brand: 'LONGi', type: 'grid', power: 90000, count: 15, phase: 3, cost: 3050000, savings: 48000 },
+    { brand: 'LONGi', type: 'grid', power: 100000, count: 15, phase: 3, cost: 3160000, savings: 49700 },
+    { brand: 'LONGi', type: 'grid', power: 105000, count: 15, phase: 3, cost: 3280000, savings: 51600 },
+    { brand: 'LONGi', type: 'grid', power: 110000, count: 15, phase: 3, cost: 3390000, savings: 53300 },
+    { brand: 'LONGi', type: 'grid', power: 120000, count: 20, phase: 3, cost: 3760000, savings: 59100 },
+    { brand: 'LONGi', type: 'grid', power: 130000, count: 20, phase: 3, cost: 3980000, savings: 62600 },
+    { brand: 'LONGi', type: 'grid', power: 140000, count: 20, phase: 3, cost: 4210000, savings: 66200 },
+    { brand: 'LONGi', type: 'grid', power: 150000, count: 20, phase: 3, cost: 4430000, savings: 69600 },
+    { brand: 'LONGi ?', type: 'grid', power: 160000, count: 25, phase: 3, cost: 4910000, savings: 77200 },
+    { brand: 'LONGi ?', type: 'grid', power: 170000, count: 25, phase: 3, cost: 5140000, savings: 80800 },
+    { brand: 'LONGi ?', type: 'grid', power: 180000, count: 25, phase: 3, cost: 5480000, savings: 86200 },
+    { brand: 'LONGi ?', type: 'grid', power: 190000, count: 25, phase: 3, cost: 5700000, savings: 89600 },
+    { brand: 'LONGi ?', type: 'grid', power: 200000, count: 30, phase: 3, cost: 5930000, savings: 93300 },
+    { brand: 'LONGi ?', type: 'grid', power: 210000, count: 30, phase: 3, cost: 6270000, savings: 98600 },
+    { brand: 'LONGi ?', type: 'grid', power: 220000, count: 30, phase: 3, cost: 6490000, savings: 102100 },
+    { brand: 'LONGi ?', type: 'grid', power: 230000, count: 40, phase: 3, cost: 6970000, savings: 109600 },
+    { brand: 'LONGi ?', type: 'grid', power: 240000, count: 40, phase: 3, cost: 7200000, savings: 113300 },
+    { brand: 'LONGi ?', type: 'grid', power: 250000, count: 40, phase: 3, cost: 7530000, savings: 118400 },
+    { brand: 'LONGi ?', type: 'grid', power: 260000, count: 40, phase: 3, cost: 7760000, savings: 122100 },
+    { brand: 'LONGi ?', type: 'grid', power: 270000, count: 40, phase: 3, cost: 8100000, savings: 127400 },
+    { brand: 'LONGi ?', type: 'grid', power: 280000, count: 40, phase: 3, cost: 8320000, savings: 130900 },
+    { brand: 'LONGi ?', type: 'grid', power: 290000, count: 40, phase: 3, cost: 8660000, savings: 136200 },
+    { brand: 'LONGi ?', type: 'grid', power: 300000, count: 40, phase: 3, cost: 8890000, savings: 139800 },
 
     // SWISS гибридные системы
     { brand: 'SWISS', type: 'hybrid', power: 22000, count: 6, phase: 1, cost: 1300000, savings: 20500 },
@@ -525,6 +837,39 @@ const solarData = [
     { brand: 'SWISS', type: 'hybrid', power: 50000, count: 8, phase: 1, cost: 2340000, savings: 36800 },
     { brand: 'SWISS', type: 'hybrid', power: 55000, count: 8, phase: 1, cost: 2450000, savings: 38500 },
     { brand: 'SWISS', type: 'hybrid', power: 60000, count: 8, phase: 1, cost: 2570000, savings: 40400 },
+    { brand: 'SWISS', type: 'hybrid', power: 65000, count: 8, phase: 1, cost: 2670000, savings: 42000 },
+    { brand: 'SWISS', type: 'hybrid', power: 65000, count: 8, phase: 1, cost: 2790000, savings: 43900 },
+    { brand: 'SWISS', type: 'hybrid', power: 68000, count: 10, phase: 1, cost: 2930000, savings: 46100 },
+    { brand: 'SWISS', type: 'hybrid', power: 70000, count: 10, phase: 1, cost: 3060000, savings: 48100 },
+    { brand: 'SWISS', type: 'hybrid', power: 75000, count: 10, phase: 1, cost: 3160000, savings: 49700 },
+    { brand: 'SWISS', type: 'hybrid', power: 50000, count: 10, phase: 3, cost: 2540000, savings: 39900 },
+    { brand: 'SWISS', type: 'hybrid', power: 55000, count: 10, phase: 3, cost: 2650000, savings: 41700 },
+    { brand: 'SWISS', type: 'hybrid', power: 60000, count: 10, phase: 3, cost: 2660000, savings: 41800 },
+    { brand: 'SWISS', type: 'hybrid', power: 65000, count: 10, phase: 3, cost: 2870000, savings: 45100 },
+    { brand: 'SWISS', type: 'hybrid', power: 68000, count: 10, phase: 3, cost: 2980000, savings: 46900 },
+    { brand: 'SWISS', type: 'hybrid', power: 70000, count: 10, phase: 3, cost: 3090000, savings: 48600 },
+    { brand: 'SWISS', type: 'hybrid', power: 75000, count: 10, phase: 3, cost: 3200000, savings: 50300 },
+    { brand: 'SWISS', type: 'hybrid', power: 77000, count: 15, phase: 3, cost: 3460000, savings: 54400 },
+    { brand: 'SWISS', type: 'hybrid', power: 80000, count: 15, phase: 3, cost: 3570000, savings: 56100 },
+    { brand: 'SWISS', type: 'hybrid', power: 90000, count: 15, phase: 3, cost: 3790000, savings: 59600 },
+    { brand: 'SWISS', type: 'hybrid', power: 100000, count: 15, phase: 3, cost: 3990000, savings: 62700 },
+    { brand: 'SWISS', type: 'hybrid', power: 105000, count: 15, phase: 3, cost: 4100000, savings: 64500 },
+    { brand: 'SWISS', type: 'hybrid', power: 110000, count: 15, phase: 3, cost: 4320000, savings: 67900 },
+    { brand: 'SWISS', type: 'hybrid', power: 120000, count: 15, phase: 3, cost: 4550000, savings: 71500 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 130000, count: 20, phase: 3, cost: 4960000, savings: 78000 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 135000, count: 20, phase: 3, cost: 5180000, savings: 81400 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 140000, count: 20, phase: 3, cost: 5290000, savings: 83200 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 150000, count: 20, phase: 3, cost: 5400000, savings: 84900 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 160000, count: 25, phase: 3, cost: 5900000, savings: 92800 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 170000, count: 25, phase: 3, cost: 6130000, savings: 96400 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 180000, count: 25, phase: 3, cost: 6460000, savings: 101600 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 190000, count: 25, phase: 3, cost: 6680000, savings: 105100 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 200000, count: 30, phase: 3, cost: 7160000, savings: 112600 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 210000, count: 30, phase: 3, cost: 7380000, savings: 116100 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 220000, count: 30, phase: 3, cost: 7710000, savings: 121300 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 230000, count: 30, phase: 3, cost: 7930000, savings: 124700 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 240000, count: 30, phase: 3, cost: 8160000, savings: 128300 },
+    { brand: 'SWISS ?', type: 'hybrid', power: 250000, count: 30, phase: 3, cost: 8500000, savings: 133700 },
 
     // SWISS сетевые системы
     { brand: 'SWISS', type: 'grid', power: 22000, count: 6, phase: 1, cost: 1000000, savings: 15800 },
@@ -536,7 +881,45 @@ const solarData = [
     { brand: 'SWISS', type: 'grid', power: 45000, count: 8, phase: 1, cost: 1770000, savings: 27900 },
     { brand: 'SWISS', type: 'grid', power: 50000, count: 8, phase: 1, cost: 1890000, savings: 29700 },
     { brand: 'SWISS', type: 'grid', power: 55000, count: 8, phase: 1, cost: 2000000, savings: 31500 },
-    { brand: 'SWISS', type: 'grid', power: 60000, count: 8, phase: 1, cost: 2120000, savings: 33400 }
+    { brand: 'SWISS', type: 'grid', power: 60000, count: 8, phase: 1, cost: 2120000, savings: 33400 },
+    { brand: 'SWISS', type: 'grid', power: 65000, count: 8, phase: 1, cost: 2220000, savings: 34900 },
+    { brand: 'SWISS', type: 'grid', power: 65000, count: 8, phase: 1, cost: 2340000, savings: 36800 },
+    { brand: 'SWISS', type: 'grid', power: 68000, count: 10, phase: 1, cost: 2420000, savings: 38100 },
+    { brand: 'SWISS', type: 'grid', power: 70000, count: 10, phase: 1, cost: 2550000, savings: 40100 },
+    { brand: 'SWISS', type: 'grid', power: 75000, count: 10, phase: 1, cost: 2650000, savings: 41700 },
+    { brand: 'SWISS', type: 'grid', power: 50000, count: 10, phase: 3, cost: 2000000, savings: 31500 },
+    { brand: 'SWISS', type: 'grid', power: 55000, count: 10, phase: 3, cost: 2110000, savings: 33200 },
+    { brand: 'SWISS', type: 'grid', power: 60000, count: 10, phase: 3, cost: 2120000, savings: 33400 },
+    { brand: 'SWISS', type: 'grid', power: 65000, count: 10, phase: 3, cost: 2330000, savings: 36700 },
+    { brand: 'SWISS', type: 'grid', power: 68000, count: 10, phase: 3, cost: 2440000, savings: 38400 },
+    { brand: 'SWISS', type: 'grid', power: 70000, count: 10, phase: 3, cost: 2550000, savings: 40100 },
+    { brand: 'SWISS', type: 'grid', power: 75000, count: 10, phase: 3, cost: 2660000, savings: 41800 },
+    { brand: 'SWISS', type: 'grid', power: 77000, count: 15, phase: 3, cost: 2800000, savings: 44000 },
+    { brand: 'SWISS', type: 'grid', power: 80000, count: 15, phase: 3, cost: 2910000, savings: 45800 },
+    { brand: 'SWISS', type: 'grid', power: 90000, count: 15, phase: 3, cost: 3130000, savings: 49200 },
+    { brand: 'SWISS', type: 'grid', power: 100000, count: 15, phase: 3, cost: 3330000, savings: 52400 },
+    { brand: 'SWISS', type: 'grid', power: 105000, count: 15, phase: 3, cost: 3440000, savings: 54100 },
+    { brand: 'SWISS', type: 'grid', power: 110000, count: 15, phase: 3, cost: 3660000, savings: 57500 },
+    { brand: 'SWISS', type: 'grid', power: 120000, count: 15, phase: 3, cost: 3890000, savings: 61200 },
+    { brand: 'SWISS', type: 'grid', power: 130000, count: 20, phase: 3, cost: 4210000, savings: 66200 },
+    { brand: 'SWISS', type: 'grid', power: 135000, count: 20, phase: 3, cost: 4430000, savings: 69600 },
+    { brand: 'SWISS', type: 'grid', power: 140000, count: 20, phase: 3, cost: 4540000, savings: 71400 },
+    { brand: 'SWISS ?', type: 'grid', power: 150000, count: 20, phase: 3, cost: 4650000, savings: 73100 },
+    { brand: 'SWISS ?', type: 'grid', power: 160000, count: 25, phase: 3, cost: 5090000, savings: 80000 },
+    { brand: 'SWISS ?', type: 'grid', power: 170000, count: 25, phase: 3, cost: 5320000, savings: 83600 },
+    { brand: 'SWISS ?', type: 'grid', power: 180000, count: 25, phase: 3, cost: 5650000, savings: 88800 },
+    { brand: 'SWISS ?', type: 'grid', power: 190000, count: 25, phase: 3, cost: 5870000, savings: 92300 },
+    { brand: 'SWISS ?', type: 'grid', power: 200000, count: 30, phase: 3, cost: 6200000, savings: 97500 },
+    { brand: 'SWISS ?', type: 'grid', power: 210000, count: 30, phase: 3, cost: 6420000, savings: 101000 },
+    { brand: 'SWISS ?', type: 'grid', power: 220000, count: 30, phase: 3, cost: 6750000, savings: 106200 },
+    { brand: 'SWISS ?', type: 'grid', power: 230000, count: 30, phase: 3, cost: 6970000, savings: 109600 },
+    { brand: 'SWISS ?', type: 'grid', power: 240000, count: 30, phase: 3, cost: 7200000, savings: 113300 },
+    { brand: 'SWISS ?', type: 'grid', power: 250000, count: 40, phase: 3, cost: 7660000, savings: 120500 },
+    { brand: 'SWISS ?', type: 'grid', power: 260000, count: 40, phase: 3, cost: 7770000, savings: 122200 },
+    { brand: 'SWISS ?', type: 'grid', power: 270000, count: 40, phase: 3, cost: 8010000, savings: 126000 },
+    { brand: 'SWISS ?', type: 'grid', power: 280000, count: 40, phase: 3, cost: 8370000, savings: 131600 },
+    { brand: 'SWISS ?', type: 'grid', power: 290000, count: 40, phase: 3, cost: 8620000, savings: 135600 },
+    { brand: 'SWISS ?', type: 'grid', power: 300000, count: 40, phase: 3, cost: 8970000, savings: 141100 }
 ];
 
 // Функция для заполнения таблицы солнечных данных
@@ -607,6 +990,7 @@ function updateSolarTableWithFilters(brand = 'all', type = 'all') {
 // Функция для получения рекомендаций на основе месячного потребления
 function getSolarRecommendations(monthlyCost) {
     const recommendations = solarData
+        .filter(item => item.savings !== null)
         .map(item => {
             const difference = Math.abs(item.savings - monthlyCost);
             return { ...item, difference };
@@ -639,7 +1023,7 @@ function displaySolarRecommendations(monthlyCost) {
     let recommendationsHTML = `
         <div class="recommendations-header">
             <h3><i class="fas fa-sun"></i> Рекомендации по солнечным панелям</h3>
-            <p>На основе ваших месячных затрат <strong>${formatCurrency(monthlyCost)}</strong> мы подобрали следующие варианты солнечных электростанций:</p>
+            <p>На основе ваших месячных затрат <strong>${formatCurrency(monthlyCost)}</strong> мы подобрали следующие варианты:</p>
         </div>
         <div class="recommendations-list">
     `;
@@ -689,16 +1073,29 @@ function displaySolarRecommendations(monthlyCost) {
     recommendationsContainer.innerHTML = recommendationsHTML;
 }
 
-let check = 0;
-document.querySelector('.calculator-switcher_open_close').addEventListener('click', () => {
-    if (check === 0) {
-        document.querySelector('.calculator-switcher').classList.add('calculator-switcher-open');
-        document.querySelector('.calculator-switcher_open_close').classList.add('calculator-switcher_open_close-active')
-        check = 1;
-    } else {
-        document.querySelector('.calculator-switcher').classList.remove('calculator-switcher-open');
-        document.querySelector('.calculator-switcher_open_close').classList.remove('calculator-switcher_open_close-active')
-        check = 0;
+// Функция для обработки изменения фильтров
+function handleFilterChange() {
+    const brandFilter = document.getElementById('brandFilter');
+    const typeFilter = document.getElementById('typeFilter');
+    updateSolarTableWithFilters(brandFilter ? brandFilter.value : 'all', typeFilter ? typeFilter.value : 'all');
+}
+
+function formatInputValue(input) {
+    if (input.value && input.value.trim() !== '') {
+        // Сохраняем позицию курсора
+        const cursorPosition = input.selectionStart;
+        const valueBeforeFormat = input.value;
+
+        input.value = formatNumber(input.value);
+
+        // Восстанавливаем позицию курсора с учетом добавленных символов
+        const addedChars = input.value.length - valueBeforeFormat.length;
+        input.setSelectionRange(cursorPosition + addedChars, cursorPosition + addedChars);
     }
-    console.log(check);
+}
+
+
+// Применяем при загрузке DOM
+document.addEventListener('DOMContentLoaded', function () {
+    applyNumberFormattingToAllInputs();
 });
