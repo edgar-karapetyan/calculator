@@ -1,7 +1,5 @@
 :root {
     --primary: #ff8400;
-    --secondary: #ff8400a1;
-    --success: #4cc9f0;
     --light: rgba(255, 255, 255, 0.041);
     --dark: #000000;
     --gray: #000000;
@@ -276,7 +274,7 @@ input[type='radio'] {
     display: none;
 
     &:hover {
-        background: var(--secondary);
+        background: #ff8400;
         transform: translateY(-2px);
         box-shadow: 0 4px 12px var(--shadow);
     }
